@@ -20,6 +20,7 @@
     "isstring",
     "istable",
     "isthread",
+    "isuserdata",
     "lightuserdata",
     "lstring",
     "metatable",
@@ -28,6 +29,8 @@
     "newuserdatauv",
     "nrec",
     "NUMTYPES",
+    "nuvalue",
+    "nuvalues",
     "pushboolean",
     "pushcclosure",
     "pushfstring",
@@ -93,6 +96,11 @@
     "xtr1common": "cpp",
     "xutility": "cpp",
     "optional": "cpp",
-    "typeindex": "cpp"
+    "typeindex": "cpp",
+    "stdexcept": "cpp",
+    "atomic": "cpp",
+    "ctime": "cpp",
+    "memory": "cpp",
+    "typeinfo": "cpp"
   }
 }

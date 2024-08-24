@@ -6,11 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 FetchContent_Declare(
-  lua
+  lua-cmake
   GIT_REPOSITORY https://github.com/Marth1nus/lua-cmake
   GIT_TAG        master
 )
-FetchContent_MakeAvailable(lua)
+FetchContent_MakeAvailable(lua-cmake)
 
 add_library(${PROJECT_NAME} src/lua-cpp.cpp)
 target_link_libraries(${PROJECT_NAME} PUBLIC lua)
