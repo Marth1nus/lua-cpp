@@ -83,6 +83,7 @@ namespace lua::types
       }(std::make_index_sequence<std::tuple_size_v<types>>());
       return index;
     }
+    [[unreachable]] throw;
   }();
 
   template <typename T>
