@@ -69,6 +69,10 @@ namespace lua::types
     using type = std::decay_t<T>;
     if constexpr (not std::movable<type> and not std::copyable<type>)
       return type_index_invalid;
+    else if constexpr (std::integral<T> and not std::same_as<T, integer>)
+      return type_index<integer>;
+    else if constexpr (std::floating_point<T> and not std::same_as<T, number>)
+      return type_index<number>;
     else
     {
       size_t index = type_index_userdata;
