@@ -136,6 +136,7 @@ namespace lua::exceptions
   {
     using std::runtime_error::runtime_error;
   };
+
   struct failed_assert : std::runtime_error
   {
     using std::runtime_error::runtime_error;
