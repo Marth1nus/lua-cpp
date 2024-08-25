@@ -14,7 +14,6 @@
 #include <string>
 #include <typeindex>
 #include <memory>
-#include <any>
 #pragma endregion
 
 #pragma region Types
@@ -154,8 +153,7 @@ namespace lua::utils
   struct exceptions_to_errors
   {
     state *L;
-    auto inline constexpr operator<<(std::invocable auto &&fn) const -> decltype(fn())
-      requires(not std::is_const_v<std::remove_reference_t<decltype(fn)>>)
+    auto inline constexpr operator<<(std::invocable auto fn) const -> decltype(fn())
     {
       auto error_message = std::string{""};
       try
@@ -316,8 +314,9 @@ namespace lua::userdata
   template <userdata T>
   auto static push_shared(state *L, std::shared_ptr<T> const &value_ptr, int nuvalue = 1) -> std::shared_ptr<T>;
 
-  auto static push(state *L, userdata auto &&value, int nuvalue = 1) -> std::add_pointer_t<std::decay_t<decltype(value)>>
-    requires(not std::is_pointer_v<std::decay_t<decltype(value)>>);
+  template <userdata T>
+    requires(not std::is_pointer_v<T>)
+  auto static push(state *L, T &&value, int nuvalue = 1) -> T *;
 
   template <userdata T>
   [[nodiscard]] auto static is(state *L, int idx, [[maybe_unused]] T const & = *(T *)0) noexcept -> bool;
@@ -428,6 +427,7 @@ namespace lua::overloads
 namespace lua::overloads::helpers
 {
   using overloads::push;
+
   template <typename RT, internal... ARGS>
   auto inline push(state *L, RT (*val)(ARGS...)) noexcept -> decltype(push(L, function{}, 1))
     requires(not std::convertible_to<decltype(val), function>)
@@ -474,9 +474,10 @@ namespace lua::userdata::impl
     inline userdata_container_base &operator=(userdata_container_base &&) noexcept = default;
     inline userdata_container_base &operator=(userdata_container_base const &) noexcept = default;
 
-    /* clang-format off */ /* */ public:    virtual ~userdata_container_base() {}
-    /*                  */ /* */ protected: virtual auto location() noexcept -> void * = 0;
-    /* clang-format on */ /*  */ public:
+  public: /* Virtual functions */ /* clang-format off */
+    /*                 */ public:    virtual ~userdata_container_base() {}
+    /*                 */ protected: virtual auto location() noexcept -> void * = 0;
+    /* clang-format on */ public:
     virtual auto type() const noexcept -> std::type_info const & = 0;
 
   public:
@@ -507,9 +508,9 @@ namespace lua::userdata::impl
     inline userdata_container &operator=(userdata_container const &) noexcept = default;
 
   public:
-    virtual ~userdata_container() {}
-    virtual auto location() noexcept -> void * { return &value; }
-    virtual auto type() const noexcept -> std::type_info const & { return typeid(T); }
+    virtual ~userdata_container() override {}
+    virtual auto location() noexcept -> void * final override { return &value; }
+    virtual auto type() const noexcept -> std::type_info const & final override { return typeid(T); }
   };
 
   template <userdata T>
@@ -525,9 +526,9 @@ namespace lua::userdata::impl
     inline userdata_container &operator=(userdata_container const &) noexcept = default;
 
   public:
-    virtual ~userdata_container() {}
-    virtual auto location() noexcept -> void * { return value.get(); }
-    virtual auto type() const noexcept -> std::type_info const & { return typeid(T); }
+    virtual ~userdata_container() override {}
+    virtual auto location() noexcept -> void * final override { return value.get(); }
+    virtual auto type() const noexcept -> std::type_info const & final override { return typeid(T); }
   };
 
   template <userdata T>
@@ -564,22 +565,23 @@ namespace lua::userdata // impl
   {
     auto udata = pushuserdata(L, impl::userdata_container{value_ptr}, nuvalue);
     push_metatable<T>(L), setmetatable(L, -2);
-    utils::assert(udata->type() == typeid(T), "This is a bug! "
-                                              "Somehow the userdata container "
-                                              "does not contain the correct type "
-                                              "or incorrectly reports its type");
+    utils::assert(udata->get_if<T>(), "This is a bug! "
+                                      "Somehow the userdata container "
+                                      "does not contain the correct type "
+                                      "or incorrectly reports its type");
     return udata->value;
   }
 
-  auto static push(state *L, userdata auto &&value, int nuvalue) -> std::add_pointer_t<std::decay_t<decltype(value)>>
-    requires(not std::is_pointer_v<std::decay_t<decltype(value)>>)
+  template <userdata T>
+    requires(not std::is_pointer_v<T>)
+  auto static push(state *L, T &&value, int nuvalue) -> T *
   {
     auto udata = pushuserdata(L, impl::userdata_container{std::forward<decltype(value)>(value)}, nuvalue);
-    push_metatable<std::decay_t<decltype(value)>>(L), setmetatable(L, -2);
-    utils::assert(udata->type() == typeid(std::decay_t<decltype(value)>), "This is a bug! "
-                                                                          "Somehow the userdata container "
-                                                                          "does not contain the correct type "
-                                                                          "or incorrectly reports its type");
+    push_metatable<T>(L), setmetatable(L, -2);
+    utils::assert(udata->get_if<T>(), "This is a bug! "
+                                      "Somehow the userdata container "
+                                      "does not contain the correct type "
+                                      "or incorrectly reports its type");
     return &udata->value;
   }
 
@@ -602,12 +604,14 @@ namespace lua::userdata // impl
     auto udata = impl::to_userdata_container(L, idx);
     if (auto res = udata->get_if<T>())
       return std::optional{res};
+    // TODO Conversions and casting
     return std::nullopt;
   }
 }
 namespace lua // using userdata::
 {
-  using userdata::push,
+  using userdata::push_shared,
+      userdata::push,
       userdata::is,
       userdata::to,
       userdata::as;
